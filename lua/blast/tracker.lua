@@ -116,6 +116,10 @@ function M.on_text_change()
     debounce_timer = uv.new_timer()
   end
 
+  if not debounce_timer then
+    return
+  end
+
   debounce_timer:start(
     config.debounce_ms,
     0,
@@ -221,6 +225,10 @@ function M.reset_idle_timer()
     idle_timer:stop()
   else
     idle_timer = uv.new_timer()
+  end
+
+  if not idle_timer then
+    return
   end
 
   idle_timer:start(

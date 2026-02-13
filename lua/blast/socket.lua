@@ -2,6 +2,7 @@ local M = {}
 
 local uv = vim.uv or vim.loop
 local config = {}
+--- @type uv.uv_pipe_t?
 local client = nil
 local ping_timer = nil
 local blastd_job = nil
@@ -37,6 +38,7 @@ local function ensure_blastd()
     return
   end
 
+  ---@diagnostic disable-next-line: missing-fields
   blastd_job = uv.spawn(bin, {
     args = {},
     stdio = { nil, stdout, stderr },
@@ -185,6 +187,10 @@ function M.send(data)
   end
 
   local json = vim.json.encode(data) .. '\n'
+
+  if not client then
+    return false, 'not connected'
+  end
 
   local ok, err = pcall(function()
     client:write(json)
