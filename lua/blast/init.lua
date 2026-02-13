@@ -1,20 +1,28 @@
 local M = {}
 
-local socket = require("blast.socket")
-local tracker = require("blast.tracker")
-
 M.config = {
   socket_path = vim.fn.expand("~/.local/share/blastd/blastd.sock"),
-  idle_timeout = 120, -- seconds of no activity before ending a session
-  debounce_ms = 1000, -- debounce activity events
+  idle_timeout = 120,
+  debounce_ms = 1000,
   debug = false,
 }
 
+local initialized = false
+
 function M.setup(opts)
+  if initialized then
+    return
+  end
+  initialized = true
+
   M.config = vim.tbl_deep_extend("force", M.config, opts or {})
+
+  local socket = require("blast.socket")
+  local tracker = require("blast.tracker")
 
   socket.setup(M.config)
   tracker.setup(M.config)
+  socket.start_keepalive()
 
   if M.config.debug then
     vim.notify("[blast.nvim] initialized", vim.log.levels.INFO)
@@ -22,6 +30,9 @@ function M.setup(opts)
 end
 
 function M.status()
+  local socket = require("blast.socket")
+  local tracker = require("blast.tracker")
+
   local connected = socket.is_connected()
   local session = tracker.get_session()
 
@@ -43,6 +54,8 @@ function M.status()
 end
 
 function M.ping()
+  local socket = require("blast.socket")
+
   local ok, err = socket.ping()
   if ok then
     vim.notify("[blast.nvim] pong!", vim.log.levels.INFO)

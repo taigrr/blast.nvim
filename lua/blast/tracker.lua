@@ -1,5 +1,6 @@
 local M = {}
 
+local uv = vim.uv or vim.loop
 local socket = require("blast.socket")
 local utils = require("blast.utils")
 
@@ -9,161 +10,228 @@ local last_activity = 0
 local debounce_timer = nil
 local idle_timer = nil
 
--- Metrics tracking
 local action_count = 0
-local word_count = 0
-local session_start_words = 0
+local session_words_added = 0
+local last_word_count = 0
 
 function M.setup(cfg)
-  config = cfg
+	config = cfg
 
-  -- Set up autocommands
-  local group = vim.api.nvim_create_augroup("BlastTracker", { clear = true })
+	local group = vim.api.nvim_create_augroup("BlastTracker", { clear = true })
 
-  -- Track buffer activity
-  vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost" }, {
-    group = group,
-    callback = function()
-      M.on_buffer_activity()
-    end,
-  })
+	vim.api.nvim_create_autocmd({ "BufEnter", "BufWritePost" }, {
+		group = group,
+		callback = function()
+			M.on_buffer_activity()
+		end,
+	})
 
-  -- Track text changes
-  vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
-    group = group,
-    callback = function()
-      M.on_text_change()
-    end,
-  })
+	vim.api.nvim_create_autocmd({ "TextChanged", "TextChangedI" }, {
+		group = group,
+		callback = function()
+			M.on_text_change()
+		end,
+	})
 
-  -- Track commands/actions
-  vim.api.nvim_create_autocmd("CmdlineLeave", {
-    group = group,
-    callback = function()
-      action_count = action_count + 1
-    end,
-  })
+	vim.api.nvim_create_autocmd("CmdlineLeave", {
+		group = group,
+		callback = function()
+			action_count = action_count + 1
+		end,
+	})
 
-  -- Track on vim leave
-  vim.api.nvim_create_autocmd("VimLeavePre", {
-    group = group,
-    callback = function()
-      M.end_session()
-    end,
-  })
+	vim.api.nvim_create_autocmd({ "TermOpen", "TermEnter" }, {
+		group = group,
+		callback = function()
+			M.on_terminal_activity()
+		end,
+	})
+
+	vim.api.nvim_create_autocmd("VimLeavePre", {
+		group = group,
+		callback = function()
+			M.end_session()
+		end,
+	})
+
+	vim.defer_fn(function()
+		M.on_buffer_activity()
+	end, 50)
 end
 
 function M.get_session()
-  return current_session
+	return current_session
+end
+
+local function count_words(bufnr)
+	local ok, lines = pcall(vim.api.nvim_buf_get_lines, bufnr, 0, -1, false)
+	if not ok then
+		return 0
+	end
+	local total = 0
+	for _, line in ipairs(lines) do
+		for _ in line:gmatch("%S+") do
+			total = total + 1
+		end
+	end
+	return total
 end
 
 function M.on_buffer_activity()
-  local now = os.time()
-  last_activity = now
+	local bufnr = vim.api.nvim_get_current_buf()
+	local filepath = vim.api.nvim_buf_get_name(bufnr)
+	local filetype = vim.bo[bufnr].filetype
 
-  local bufnr = vim.api.nvim_get_current_buf()
-  local filepath = vim.api.nvim_buf_get_name(bufnr)
-  local filetype = vim.bo[bufnr].filetype
+	if vim.bo[bufnr].buftype == "terminal" then
+		M.on_terminal_activity()
+		return
+	end
 
-  -- Skip non-file buffers
-  if filepath == "" or vim.bo[bufnr].buftype ~= "" then
-    return
-  end
+	if filepath == "" or vim.bo[bufnr].buftype ~= "" then
+		return
+	end
 
-  local project, git_remote = utils.get_project_info(filepath)
+	last_activity = os.time()
+	local project, git_remote = utils.get_project_info(filepath)
 
-  -- Check if we need to start a new session
-  if not current_session or current_session.project ~= project then
-    M.end_session()
-    M.start_session(project, git_remote, filetype)
-  elseif current_session.filetype ~= filetype then
-    current_session.filetype = filetype
-  end
+	if not current_session or current_session.project ~= project then
+		M.end_session()
+		M.start_session(project, git_remote, filetype)
+	elseif current_session.filetype ~= filetype then
+		current_session.filetype = filetype
+	end
 
-  M.reset_idle_timer()
+	last_word_count = count_words(bufnr)
+
+	M.reset_idle_timer()
 end
 
 function M.on_text_change()
-  last_activity = os.time()
-  action_count = action_count + 1
+	last_activity = os.time()
+	action_count = action_count + 1
 
-  -- Count words for WPM calculation
-  local bufnr = vim.api.nvim_get_current_buf()
-  local lines = vim.api.nvim_buf_get_lines(bufnr, 0, -1, false)
-  local text = table.concat(lines, " ")
-  word_count = select(2, text:gsub("%S+", ""))
+	if debounce_timer then
+		debounce_timer:stop()
+	else
+		debounce_timer = uv.new_timer()
+	end
 
-  M.reset_idle_timer()
+	debounce_timer:start(
+		config.debounce_ms,
+		0,
+		vim.schedule_wrap(function()
+			local bufnr = vim.api.nvim_get_current_buf()
+			if not vim.api.nvim_buf_is_valid(bufnr) then
+				return
+			end
+			local new_count = count_words(bufnr)
+			local delta = new_count - last_word_count
+			if delta > 0 then
+				session_words_added = session_words_added + delta
+			end
+			last_word_count = new_count
+		end)
+	)
+
+	M.reset_idle_timer()
+end
+
+function M.on_terminal_activity()
+	last_activity = os.time()
+	action_count = action_count + 1
+	M.reset_idle_timer()
 end
 
 function M.start_session(project, git_remote, filetype)
-  current_session = {
-    project = project,
-    git_remote = git_remote,
-    filetype = filetype,
-    started_at = os.time(),
-  }
+	current_session = {
+		project = project,
+		git_remote = git_remote,
+		filetype = filetype,
+		started_at = os.time(),
+	}
 
-  action_count = 0
-  session_start_words = word_count
+	action_count = 0
+	session_words_added = 0
+	last_word_count = 0
 
-  if config.debug then
-    vim.schedule(function()
-      vim.notify(string.format("[blast.nvim] started session: %s", project or "unknown"), vim.log.levels.DEBUG)
-    end)
-  end
+	local bufnr = vim.api.nvim_get_current_buf()
+	if vim.api.nvim_buf_is_valid(bufnr) then
+		last_word_count = count_words(bufnr)
+	end
+
+	if config.debug then
+		vim.schedule(function()
+			vim.notify(string.format("[blast.nvim] started session: %s", project or "unknown"), vim.log.levels.DEBUG)
+		end)
+	end
 end
 
 function M.end_session()
-  if not current_session then
-    return
-  end
+	if not current_session then
+		return
+	end
 
-  local now = os.time()
-  local duration = now - current_session.started_at
+	local session = current_session
+	current_session = nil
 
-  -- Only send if session was at least 10 seconds
-  if duration >= 10 then
-    local minutes = duration / 60
-    local apm = minutes > 0 and (action_count / minutes) or 0
-    local wpm = minutes > 0 and ((word_count - session_start_words) / minutes) or 0
+	local now = os.time()
+	local duration = now - session.started_at
 
-    local activity = {
-      project = current_session.project,
-      git_remote = current_session.git_remote,
-      started_at = os.date("!%Y-%m-%dT%H:%M:%SZ", current_session.started_at),
-      ended_at = os.date("!%Y-%m-%dT%H:%M:%SZ", now),
-      filetype = current_session.filetype,
-      actions_per_minute = math.floor(apm * 10) / 10,
-      words_per_minute = math.floor(wpm * 10) / 10,
-    }
+	if duration < 10 then
+		action_count = 0
+		session_words_added = 0
+		last_word_count = 0
+		return
+	end
 
-    socket.send_activity(activity)
+	local minutes = duration / 60
+	local apm = minutes > 0 and (action_count / minutes) or 0
+	local wpm = minutes > 0 and (session_words_added / minutes) or 0
 
-    if config.debug then
-      vim.schedule(function()
-        vim.notify(
-          string.format("[blast.nvim] ended session: %s (%ds, %.1f APM)", current_session.project or "unknown", duration, apm),
-          vim.log.levels.DEBUG
-        )
-      end)
-    end
-  end
+	local activity = {
+		project = session.project,
+		git_remote = session.git_remote,
+		started_at = os.date("!%Y-%m-%dT%H:%M:%SZ", session.started_at),
+		ended_at = os.date("!%Y-%m-%dT%H:%M:%SZ", now),
+		filetype = session.filetype,
+		actions_per_minute = math.floor(apm * 10) / 10,
+		words_per_minute = math.floor(wpm * 10) / 10,
+		editor = "neovim",
+	}
 
-  current_session = nil
-  action_count = 0
+	socket.send_activity(activity)
+
+	if config.debug then
+		local project_name = session.project or "unknown"
+		vim.schedule(function()
+			vim.notify(
+				string.format("[blast.nvim] ended session: %s (%ds, %.1f APM)", project_name, duration, apm),
+				vim.log.levels.DEBUG
+			)
+		end)
+	end
+
+	action_count = 0
+	session_words_added = 0
+	last_word_count = 0
 end
 
 function M.reset_idle_timer()
-  if idle_timer then
-    idle_timer:stop()
-  end
+	if idle_timer then
+		idle_timer:stop()
+	else
+		idle_timer = uv.new_timer()
+	end
 
-  idle_timer = vim.defer_fn(function()
-    if current_session and (os.time() - last_activity) >= config.idle_timeout then
-      M.end_session()
-    end
-  end, config.idle_timeout * 1000)
+	idle_timer:start(
+		config.idle_timeout * 1000,
+		0,
+		vim.schedule_wrap(function()
+			if current_session and (os.time() - last_activity) >= config.idle_timeout then
+				M.end_session()
+			end
+		end)
+	)
 end
 
 return M
