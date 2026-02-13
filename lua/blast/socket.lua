@@ -7,13 +7,37 @@ local client = nil
 local ping_timer = nil
 local blastd_job = nil
 
+local function is_socket_alive(sock_path)
+  local probe = uv.new_pipe(false)
+  if not probe then
+    return false
+  end
+  local alive = nil
+  pcall(function()
+    probe:connect(sock_path, function(err)
+      alive = not err
+      pcall(probe.close, probe)
+    end)
+  end)
+  vim.wait(200, function()
+    return alive ~= nil
+  end, 10)
+  if alive == nil then
+    pcall(probe.close, probe)
+  end
+  return alive == true
+end
+
 local function ensure_blastd()
   local sock_path = config.socket_path
   if not sock_path then
     return
   end
   if uv.fs_stat(sock_path) then
-    return
+    if is_socket_alive(sock_path) then
+      return
+    end
+    os.remove(sock_path)
   end
 
   local bin = vim.fn.exepath 'blastd'
@@ -152,6 +176,13 @@ local function connect()
 
   if connected then
     client = sock
+    sock:read_start(function(err, data)
+      if err or not data then
+        vim.schedule(function()
+          M.disconnect()
+        end)
+      end
+    end)
     return true
   else
     client = nil
@@ -161,7 +192,9 @@ end
 
 function M.setup(cfg)
   config = cfg
-  connect()
+  vim.defer_fn(function()
+    connect()
+  end, 0)
 end
 
 function M.is_connected()
@@ -192,8 +225,16 @@ function M.send(data)
     return false, 'not connected'
   end
 
+  local write_err = nil
   local ok, err = pcall(function()
-    client:write(json)
+    client:write(json, function(werr)
+      if werr then
+        write_err = werr
+        vim.schedule(function()
+          M.disconnect()
+        end)
+      end
+    end)
   end)
 
   if not ok then

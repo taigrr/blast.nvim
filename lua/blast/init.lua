@@ -53,6 +53,14 @@ function M.status()
   vim.notify(table.concat(lines, '\n'), vim.log.levels.INFO)
 end
 
+function M.statusline()
+  local ok, socket = pcall(require, 'blast.socket')
+  if ok and socket.is_connected() then
+    return '\xF0\x9F\x9A\x80'
+  end
+  return '\xF0\x9F\x92\xA5'
+end
+
 function M.ping()
   local socket = require 'blast.socket'
 
