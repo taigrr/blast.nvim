@@ -15,11 +15,12 @@ end
 function M.get_project_info(filepath)
   local dir = vim.fn.fnamemodify(filepath, ':h')
   if project_cache[dir] then
-    return project_cache[dir].project, project_cache[dir].git_remote, project_cache[dir].private
+    return project_cache[dir].project, project_cache[dir].git_remote, project_cache[dir].private, project_cache[dir].git_branch
   end
 
   local project = nil
   local git_remote = nil
+  local git_branch = nil
   local private = false
 
   local git_dir = M.find_dir_upward('.git', dir)
@@ -48,6 +49,11 @@ function M.get_project_info(filepath)
     if remote and remote ~= '' then
       git_remote = vim.trim(remote)
     end
+
+    local branch = M.exec('git -C ' .. vim.fn.shellescape(git_root) .. ' rev-parse --abbrev-ref HEAD 2>/dev/null')
+    if branch and branch ~= '' then
+      git_branch = vim.trim(branch)
+    end
   end
 
   if not project then
@@ -57,10 +63,11 @@ function M.get_project_info(filepath)
   project_cache[dir] = {
     project = project,
     git_remote = git_remote,
+    git_branch = git_branch,
     private = private,
   }
 
-  return project, git_remote, private
+  return project, git_remote, private, git_branch
 end
 
 function M.find_file_upward(filename, start_dir, stop_dir)

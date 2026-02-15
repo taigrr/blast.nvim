@@ -93,6 +93,7 @@ local function build_activities()
   local session = current_session
   local project_name = session.private and 'private' or session.project
   local remote = session.private and 'private' or session.git_remote
+  local branch = session.private and 'private' or session.git_branch
   local now = os.time()
   local activities = {}
 
@@ -120,6 +121,7 @@ local function build_activities()
       payload = {
         project = project_name,
         git_remote = remote,
+        git_branch = branch,
         started_at = os.date('!%Y-%m-%dT%H:%M:%SZ', started_at),
         ended_at = os.date('!%Y-%m-%dT%H:%M:%SZ', now),
         filename = filename,
@@ -300,11 +302,11 @@ function M.on_buffer_activity()
   end
 
   last_activity = os.time()
-  local project, git_remote, private = utils.get_project_info(filepath)
+  local project, git_remote, private, git_branch = utils.get_project_info(filepath)
 
   if not current_session or current_session.project ~= project then
     M.end_session()
-    M.start_session(project, git_remote, filetype, private)
+    M.start_session(project, git_remote, filetype, private, git_branch)
   end
 
   if filepath ~= current_file then
@@ -391,10 +393,11 @@ function M.on_terminal_activity()
   M.reset_idle_timer()
 end
 
-function M.start_session(project, git_remote, filetype, private)
+function M.start_session(project, git_remote, filetype, private, git_branch)
   current_session = {
     project = project,
     git_remote = git_remote,
+    git_branch = git_branch,
     started_at = os.time(),
     private = private or false,
   }
