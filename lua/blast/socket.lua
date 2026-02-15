@@ -245,6 +245,89 @@ function M.send(data)
   return true
 end
 
+function M.request(data, callback)
+  ensure_blastd()
+
+  if not config.socket_path then
+    callback(false, 'no socket path configured')
+    return
+  end
+
+  local sock = uv.new_pipe(false)
+  if not sock then
+    callback(false, 'failed to create pipe')
+    return
+  end
+
+  local completed = false
+  local function finish(ok_val, result)
+    if completed then
+      return
+    end
+    completed = true
+    pcall(function()
+      sock:read_stop()
+    end)
+    pcall(function()
+      sock:close()
+    end)
+    vim.schedule(function()
+      callback(ok_val, result)
+    end)
+  end
+
+  local conn_ok, conn_err = pcall(function()
+    sock:connect(config.socket_path, function(connect_err)
+      if connect_err then
+        finish(false, 'connect failed: ' .. tostring(connect_err))
+        return
+      end
+
+      local json_str = vim.json.encode(data) .. '\n'
+      local buf = ''
+
+      sock:read_start(function(read_err, read_data)
+        if read_err then
+          finish(false, 'read error: ' .. tostring(read_err))
+          return
+        end
+        if not read_data then
+          finish(false, 'connection closed')
+          return
+        end
+
+        buf = buf .. read_data
+        local line = buf:match '^([^\n]+)\n'
+        if not line then
+          return
+        end
+
+        local decode_ok, resp = pcall(vim.json.decode, line)
+        if not decode_ok then
+          finish(false, 'invalid response')
+          return
+        end
+
+        if resp.ok then
+          finish(true, resp.message or 'ok')
+        else
+          finish(false, resp.error or 'unknown error')
+        end
+      end)
+
+      sock:write(json_str, function(write_err)
+        if write_err then
+          finish(false, 'write failed: ' .. tostring(write_err))
+        end
+      end)
+    end)
+  end)
+
+  if not conn_ok then
+    finish(false, tostring(conn_err))
+  end
+end
+
 function M.ping()
   return M.send { type = 'ping' }
 end
@@ -254,6 +337,10 @@ function M.send_activity(activity)
     type = 'activity',
     data = activity,
   }
+end
+
+function M.send_sync(callback)
+  M.request({ type = 'sync' }, callback)
 end
 
 function M.start_keepalive()

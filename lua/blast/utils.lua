@@ -15,13 +15,17 @@ end
 function M.get_project_info(filepath)
   local dir = vim.fn.fnamemodify(filepath, ':h')
   if project_cache[dir] then
-    return project_cache[dir].project, project_cache[dir].git_remote
+    return project_cache[dir].project, project_cache[dir].git_remote, project_cache[dir].private
   end
 
   local project = nil
   local git_remote = nil
+  local private = false
 
-  local blast_config = M.find_file_upward('.blast.toml', dir)
+  local git_dir = M.find_dir_upward('.git', dir)
+  local git_root = git_dir and vim.fn.fnamemodify(git_dir, ':h') or nil
+
+  local blast_config = M.find_file_upward('.blast.toml', dir, git_root)
   if blast_config then
     local config_content = M.read_file(blast_config)
     if config_content then
@@ -29,17 +33,18 @@ function M.get_project_info(filepath)
       if name then
         project = name
       end
+      if config_content:match 'private%s*=%s*true' then
+        private = true
+      end
     end
   end
 
-  local git_dir = M.find_dir_upward('.git', dir)
-  if git_dir then
+  if git_root then
     if not project then
-      project = vim.fn.fnamemodify(vim.fn.fnamemodify(git_dir, ':h'), ':t')
+      project = vim.fn.fnamemodify(git_root, ':t')
     end
 
-    local remote =
-      M.exec('git -C ' .. vim.fn.shellescape(vim.fn.fnamemodify(git_dir, ':h')) .. ' remote get-url origin 2>/dev/null')
+    local remote = M.exec('git -C ' .. vim.fn.shellescape(git_root) .. ' remote get-url origin 2>/dev/null')
     if remote and remote ~= '' then
       git_remote = vim.trim(remote)
     end
@@ -52,30 +57,27 @@ function M.get_project_info(filepath)
   project_cache[dir] = {
     project = project,
     git_remote = git_remote,
+    private = private,
   }
 
-  return project, git_remote
+  return project, git_remote, private
 end
 
-function M.find_file_upward(filename, start_dir)
+function M.find_file_upward(filename, start_dir, stop_dir)
   local dir = start_dir
   while not is_root(dir) do
     local path = dir .. '/' .. filename
     if vim.fn.filereadable(path) == 1 then
       return path
     end
+    if stop_dir and dir == stop_dir then
+      break
+    end
     local parent = vim.fn.fnamemodify(dir, ':h')
     if parent == dir then
       break
     end
     dir = parent
-  end
-  if not is_root(dir) then
-    return nil
-  end
-  local path = dir .. '/' .. filename
-  if vim.fn.filereadable(path) == 1 then
-    return path
   end
   return nil
 end
@@ -99,6 +101,15 @@ function M.find_dir_upward(dirname, start_dir)
   local path = dir .. '/' .. dirname
   if vim.fn.isdirectory(path) == 1 then
     return path
+  end
+  return nil
+end
+
+function M.get_git_root(filepath)
+  local dir = vim.fn.fnamemodify(filepath, ':h')
+  local git_dir = M.find_dir_upward('.git', dir)
+  if git_dir then
+    return vim.fn.fnamemodify(git_dir, ':h')
   end
   return nil
 end

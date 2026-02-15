@@ -16,6 +16,7 @@ To manually test, install the plugin in Neovim and run:
 
 - `:BlastStatus` — show socket connection and session info
 - `:BlastPing` — ping the blastd daemon
+- `:BlastSync` — trigger an immediate sync to the Blast server (rate-limited to 10 per 10 minutes)
 
 ## Code Organization
 
@@ -72,6 +73,7 @@ Messages are JSON objects terminated by `\n`, sent over a Unix domain socket. Tw
 
 - `{ "type": "ping" }` — health check / keepalive
 - `{ "type": "activity", "data": { ... } }` — session activity report
+- `{ "type": "sync" }` — trigger immediate sync (response includes `ok`, `error`, `message` fields)
 
 Activity data includes: `project`, `git_remote`, `started_at`, `ended_at` (ISO 8601 UTC), `filetype`, `actions_per_minute`, `words_per_minute`, `editor` (always `"neovim"`).
 
@@ -127,5 +129,5 @@ return M
 
 - **New tracked events**: Add autocommands in `tracker.setup()`, update metrics in the module-local variables, include new fields in the `activity` table sent from `end_session()`
 - **New user commands**: Register in `plugin/blast.lua`, implement in `lua/blast/init.lua`
-- **New socket message types**: Add a method in `socket.lua` following the `send_activity` pattern
+- **New socket message types**: For fire-and-forget messages, add a method in `socket.lua` following the `send_activity` pattern. For request-response messages (like sync), use the `request()` method which opens a dedicated connection and invokes a callback with the parsed response
 - **New config options**: Add defaults in `M.config` in `init.lua`, access via `config` locals passed through `setup()`
