@@ -17,6 +17,22 @@ local file_metrics = {}
 local last_word_count = 0
 local last_line_count = 0
 
+local ignored_filetypes = {
+  NvimTree = true,
+}
+
+local function is_ignored_buf(bufnr)
+  local ft = vim.bo[bufnr].filetype
+  if ignored_filetypes[ft] then
+    return true
+  end
+  local name = vim.api.nvim_buf_get_name(bufnr)
+  if name:match ':crush$' or name == 'Crush Logs' then
+    return true
+  end
+  return false
+end
+
 local function new_metrics()
   return {
     action_count = 0,
@@ -242,7 +258,7 @@ function M.setup(cfg)
     callback = function()
       if current_file then
         local m = file_metrics[current_file]
-        if m then
+        if m and not is_ignored_buf(vim.api.nvim_get_current_buf()) then
           m.action_count = m.action_count + 1
         end
       end
@@ -334,7 +350,9 @@ function M.on_text_change()
 
   local filetype = vim.bo[bufnr].filetype
   local m = get_file_metrics(filepath, filetype)
-  m.action_count = m.action_count + 1
+  if not is_ignored_buf(bufnr) then
+    m.action_count = m.action_count + 1
+  end
 
   if filepath ~= current_file then
     clock_out_current()
@@ -365,21 +383,23 @@ function M.on_text_change()
         return
       end
 
-      local new_words = count_words(buf)
-      local word_delta = new_words - last_word_count
-      if word_delta > 0 then
-        m.words_added = m.words_added + word_delta
-      end
-      last_word_count = new_words
+      if not is_ignored_buf(buf) then
+        local new_words = count_words(buf)
+        local word_delta = new_words - last_word_count
+        if word_delta > 0 then
+          m.words_added = m.words_added + word_delta
+        end
+        last_word_count = new_words
 
-      local new_lines = vim.api.nvim_buf_line_count(buf)
-      local line_delta = new_lines - last_line_count
-      if line_delta > 0 then
-        m.lines_added = m.lines_added + line_delta
-      elseif line_delta < 0 then
-        m.lines_removed = m.lines_removed - line_delta
+        local new_lines = vim.api.nvim_buf_line_count(buf)
+        local line_delta = new_lines - last_line_count
+        if line_delta > 0 then
+          m.lines_added = m.lines_added + line_delta
+        elseif line_delta < 0 then
+          m.lines_removed = m.lines_removed - line_delta
+        end
+        last_line_count = new_lines
       end
-      last_line_count = new_lines
     end)
   )
 
