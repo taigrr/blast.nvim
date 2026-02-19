@@ -5,7 +5,6 @@ Neovim plugin for [Blast](https://github.com/taigrr/blast) activity tracking.
 ## Requirements
 
 - Neovim 0.9+
-- [blastd](https://github.com/taigrr/blastd) installed in PATH (auto-started by the plugin if not running)
 - [glaze.nvim](https://github.com/taigrr/glaze.nvim) manages the `blastd` binary automatically
 
 ## Installation
@@ -35,6 +34,14 @@ use {
     require("blast").setup()
   end,
 }
+```
+
+After installing, run `:GlazeInstall blastd` to install the daemon (or it will be installed automatically on first use if glaze.nvim is configured with `auto_install = true`).
+
+Alternatively, install blastd manually:
+
+```sh
+go install github.com/taigrr/blastd@latest
 ```
 
 ## Configuration
@@ -108,7 +115,16 @@ For global privacy (all projects), set `metrics_only = true` in your [blastd con
 - Actions per minute (commands, edits)
 - Words per minute
 
+## Health Check
+
+Run `:checkhealth blast` to verify your setup:
+
+- Neovim version
+- glaze.nvim availability
+- blastd binary installation
+- Socket connection status
+
 ## Related Projects
 
-- [blast](https://github.com/taigrr/blast) - Web dashboard and API
 - [blastd](https://github.com/taigrr/blastd) - Local daemon
+- [glaze.nvim](https://github.com/taigrr/glaze.nvim) - Go binary manager for Neovim

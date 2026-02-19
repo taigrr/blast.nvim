@@ -40,8 +40,9 @@ local function ensure_blastd()
     os.remove(sock_path)
   end
 
-  local bin = vim.fn.exepath 'blastd'
-  if bin == '' then
+  local utils = require('blast.utils')
+  local bin = utils.find_blastd_bin()
+  if not bin then
     if config.debug then
       vim.schedule(function()
         vim.notify('[blast.nvim] blastd not found in PATH', vim.log.levels.WARN)
@@ -176,8 +177,8 @@ local function connect()
 
   if connected then
     client = sock
-    sock:read_start(function(err, data)
-      if err or not data then
+    sock:read_start(function(read_err, data)
+      if read_err or not data then
         vim.schedule(function()
           M.disconnect()
         end)
@@ -225,11 +226,9 @@ function M.send(data)
     return false, 'not connected'
   end
 
-  local write_err = nil
   local ok, err = pcall(function()
     client:write(json, function(werr)
       if werr then
-        write_err = werr
         vim.schedule(function()
           M.disconnect()
         end)

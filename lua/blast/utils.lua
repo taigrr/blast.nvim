@@ -141,4 +141,20 @@ function M.exec(cmd)
   return result
 end
 
+function M.find_blastd_bin()
+  -- Check glaze.nvim first, then fall back to PATH
+  local glaze_ok, glaze = pcall(require, 'glaze')
+  if glaze_ok and glaze.bin_path then
+    local bin = glaze.bin_path('blastd')
+    if bin and bin ~= '' then
+      return bin
+    end
+  end
+  local bin = vim.fn.exepath('blastd')
+  if bin and bin ~= '' then
+    return bin
+  end
+  return nil
+end
+
 return M

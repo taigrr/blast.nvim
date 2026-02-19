@@ -26,13 +26,15 @@ function M.check()
     })
   end
 
-  -- Check blastd binary
-  if vim.fn.executable("blastd") == 1 then
-    local version = vim.fn.system("blastd --version 2>/dev/null"):gsub("%s+$", "")
+  -- Check blastd binary (uses glaze path if available)
+  local utils = require("blast.utils")
+  local bin = utils.find_blastd_bin()
+  if bin then
+    local version = vim.fn.system(vim.fn.shellescape(bin) .. " --version 2>/dev/null"):gsub("%s+$", "")
     if version ~= "" then
       vim.health.ok("blastd found: " .. version)
     else
-      vim.health.ok("blastd found")
+      vim.health.ok("blastd found: " .. bin)
     end
   else
     vim.health.error("blastd not found", {
@@ -42,13 +44,19 @@ function M.check()
     })
   end
 
-  -- Check socket
-  local config = require("blast").config
-  local sock_path = vim.fn.expand(config.socket_path)
-  if vim.uv.fs_stat(sock_path) then
-    vim.health.ok("blastd socket found: " .. sock_path)
-  else
-    vim.health.info("blastd socket not found (daemon may not be running): " .. sock_path)
+  -- Check socket connection
+  local ok, socket = pcall(require, "blast.socket")
+  if ok then
+    if socket.is_connected() then
+      vim.health.ok("Connected to blastd socket")
+    else
+      local config = require("blast").config
+      local socket_path = config and config.socket_path or "~/.local/share/blastd/blastd.sock"
+      vim.health.info("Not connected to blastd socket", {
+        "Socket path: " .. socket_path,
+        "blastd will be auto-started when needed",
+      })
+    end
   end
 
   -- Check config file
