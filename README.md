@@ -6,6 +6,7 @@ Neovim plugin for [Blast](https://github.com/taigrr/blast) activity tracking.
 
 - Neovim 0.9+
 - [blastd](https://github.com/taigrr/blastd) installed in PATH (auto-started by the plugin if not running)
+- [glaze.nvim](https://github.com/taigrr/glaze.nvim) manages the `blastd` binary automatically
 
 ## Installation
 
@@ -14,6 +15,7 @@ Neovim plugin for [Blast](https://github.com/taigrr/blast) activity tracking.
 ```lua
 {
   "taigrr/blast.nvim",
+  dependencies = { "taigrr/glaze.nvim" },
   event = "VeryLazy",
   opts = {
     -- socket_path = "~/.local/share/blastd/blastd.sock",
@@ -28,6 +30,7 @@ Neovim plugin for [Blast](https://github.com/taigrr/blast) activity tracking.
 ```lua
 use {
   "taigrr/blast.nvim",
+  requires = { "taigrr/glaze.nvim" },
   config = function()
     require("blast").setup()
   end,
