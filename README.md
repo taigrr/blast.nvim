@@ -44,21 +44,6 @@ Alternatively, install blastd manually:
 go install github.com/taigrr/blastd@latest
 ```
 
-## Configuration
-
-```lua
-require("blast").setup({
-  -- Path to blastd socket
-  socket_path = vim.fn.expand("~/.local/share/blastd/blastd.sock"),
-  -- Seconds of inactivity before ending a session
-  idle_timeout = 120,
-  -- Debounce activity events (ms)
-  debounce_ms = 1000,
-  -- Enable debug logging
-  debug = false,
-})
-```
-
 ## Commands
 
 - `:BlastPing` - Ping the blastd daemon
