@@ -6,7 +6,7 @@ Guide for AI agents working in the blast.nvim codebase.
 
 blast.nvim is a Neovim plugin that tracks coding activity (time, filetypes, APM, WPM) and sends it to a local [blastd](https://github.com/taigrr/blastd) daemon via Unix socket. The daemon syncs data to the [Blast](https://github.com/taigrr/blast) web dashboard.
 
-**Requirements**: Neovim 0.9+, blastd daemon installed in PATH (auto-started if not running).
+**Requirements**: Neovim 0.9+, [glaze.nvim](https://github.com/taigrr/glaze.nvim) (optional, for binary management), blastd daemon (auto-installed via glaze or manually).
 
 ## Commands
 
@@ -24,10 +24,11 @@ To manually test, install the plugin in Neovim and run:
 plugin/
   blast.lua          # Entry point: guard + user command registration
 lua/blast/
-  init.lua           # Public API: setup(), status(), ping(); holds config; setup guard
+  init.lua           # Public API: setup(), status(), ping(); holds config; setup guard; glaze registration
   socket.lua         # Unix socket client (async connect, send JSON, ping, keepalive, auto-start blastd)
   tracker.lua        # Autocommand-based activity tracking + session management with debounce
   utils.lua          # Filesystem helpers: project detection, file search, exec (cross-platform)
+  health.lua         # Health check module (:checkhealth blast)
 ```
 
 This follows the standard Neovim plugin layout:
@@ -50,12 +51,12 @@ This follows the standard Neovim plugin layout:
 
 Defaults in `init.lua`:
 
-| Key | Default | Purpose |
-| --- | --- | --- |
-| `socket_path` | `~/.local/share/blastd/blastd.sock` | Unix socket to blastd |
-| `idle_timeout` | `120` | Seconds before ending an idle session |
-| `debounce_ms` | `1000` | Debounce interval for word count updates |
-| `debug` | `false` | Enable `vim.notify` debug messages |
+| Key            | Default                             | Purpose                                  |
+| -------------- | ----------------------------------- | ---------------------------------------- |
+| `socket_path`  | `~/.local/share/blastd/blastd.sock` | Unix socket to blastd                    |
+| `idle_timeout` | `120`                               | Seconds before ending an idle session    |
+| `debounce_ms`  | `1000`                              | Debounce interval for word count updates |
+| `debug`        | `false`                             | Enable `vim.notify` debug messages       |
 
 Users pass overrides to `require("blast").setup(opts)`. Config is merged with `vim.tbl_deep_extend("force", ...)`.
 
@@ -131,3 +132,27 @@ return M
 - **New user commands**: Register in `plugin/blast.lua`, implement in `lua/blast/init.lua`
 - **New socket message types**: For fire-and-forget messages, add a method in `socket.lua` following the `send_activity` pattern. For request-response messages (like sync), use the `request()` method which opens a dedicated connection and invokes a callback with the parsed response
 - **New config options**: Add defaults in `M.config` in `init.lua`, access via `config` locals passed through `setup()`
+
+## Glaze Integration
+
+The plugin registers `blastd` with [glaze.nvim](https://github.com/taigrr/glaze.nvim) at module load time (before `setup()` is called):
+
+```lua
+local _glaze_ok, _glaze = pcall(require, "glaze")
+if _glaze_ok then
+  _glaze.register("blastd", "github.com/taigrr/blastd", {
+    plugin = "blast.nvim",
+  })
+end
+```
+
+This allows users to install/update blastd via `:GlazeInstall blastd` or `:GlazeUpdate blastd`. The registration is optional — if glaze.nvim is not installed, the plugin falls back to expecting blastd in PATH.
+
+## Health Check
+
+Run `:checkhealth blast` to verify:
+
+- Neovim version (>= 0.9)
+- glaze.nvim availability (optional, shows warning if missing)
+- blastd binary installation (error if missing, suggests `:GlazeInstall blastd`)
+- Socket connection status (info only)
