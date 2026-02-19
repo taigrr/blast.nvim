@@ -1,5 +1,13 @@
 local M = {}
 
+-- Register with glaze.nvim if available
+local _glaze_ok, _glaze = pcall(require, "glaze")
+if _glaze_ok then
+  _glaze.register("blastd", "github.com/taigrr/blastd", {
+    plugin = "blast.nvim",
+  })
+end
+
 M.config = {
   socket_path = vim.fn.expand '~/.local/share/blastd/blastd.sock',
   idle_timeout = 120,
