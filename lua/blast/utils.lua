@@ -157,4 +157,8 @@ function M.find_blastd_bin()
   return nil
 end
 
+function M.clear_project_cache()
+  project_cache = {}
+end
+
 return M
