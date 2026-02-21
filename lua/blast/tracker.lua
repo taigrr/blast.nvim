@@ -322,6 +322,7 @@ function M.on_buffer_activity()
 
   if not current_session or current_session.project ~= project then
     M.end_session()
+    utils.clear_project_cache()
     M.start_session(project, git_remote, filetype, private, git_branch)
   end
 
