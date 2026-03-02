@@ -304,6 +304,11 @@ function M.get_file_count()
 end
 
 function M.on_buffer_activity()
+  local blast = require 'blast'
+  if blast.is_stopped() then
+    return
+  end
+
   local bufnr = vim.api.nvim_get_current_buf()
   local filepath = vim.api.nvim_buf_get_name(bufnr)
   local filetype = vim.bo[bufnr].filetype
@@ -341,6 +346,11 @@ function M.on_buffer_activity()
 end
 
 function M.on_text_change()
+  local blast = require 'blast'
+  if blast.is_stopped() then
+    return
+  end
+
   last_activity = os.time()
 
   local bufnr = vim.api.nvim_get_current_buf()

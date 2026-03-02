@@ -101,4 +101,45 @@ function M.sync()
   end)
 end
 
+
+local stopped = false
+
+function M.stop()
+  if stopped then
+    vim.notify('[blast.nvim] already stopped', vim.log.levels.WARN)
+    return
+  end
+  stopped = true
+
+  local socket = require 'blast.socket'
+  local tracker = require 'blast.tracker'
+
+  tracker.end_session()
+  socket.stop_keepalive()
+  socket.disconnect()
+
+  vim.notify('[blast.nvim] tracking stopped', vim.log.levels.INFO)
+end
+
+function M.start()
+  if not stopped then
+    vim.notify('[blast.nvim] already running', vim.log.levels.WARN)
+    return
+  end
+  stopped = false
+
+  local socket = require 'blast.socket'
+  local tracker = require 'blast.tracker'
+
+  socket.setup(M.config)
+  socket.start_keepalive()
+  tracker.on_buffer_activity()
+
+  vim.notify('[blast.nvim] tracking started', vim.log.levels.INFO)
+end
+
+function M.is_stopped()
+  return stopped
+end
+
 return M

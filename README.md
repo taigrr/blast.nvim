@@ -24,16 +24,10 @@ Neovim plugin for [NvimBlast](https://nvimblast.com) activity tracking.
 }
 ```
 
-### packer.nvim
+### rocks.nvim
 
-```lua
-use {
-  "taigrr/blast.nvim",
-  requires = { "taigrr/glaze.nvim" },
-  config = function()
-    require("blast").setup()
-  end,
-}
+```vim
+:Rocks install blast.nvim
 ```
 
 After installing, run `:GlazeInstall blastd` to install the daemon (or it will be installed automatically on first use if glaze.nvim is configured with `auto_install = true`).
@@ -49,6 +43,8 @@ go install github.com/taigrr/blastd@latest
 - `:BlastPing` - Ping the blastd daemon
 - `:BlastStatus` - Show current tracking status
 - `:BlastSync` - Trigger immediate sync to Blast server
+- `:BlastStop` - Stop activity tracking
+- `:BlastStart` - Resume activity tracking
 
 ## Project Configuration
 
