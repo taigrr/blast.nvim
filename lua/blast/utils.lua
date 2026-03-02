@@ -86,6 +86,13 @@ function M.find_file_upward(filename, start_dir, stop_dir)
     end
     dir = parent
   end
+  -- Check root directory (the while loop skips it)
+  if is_root(dir) then
+    local path = dir .. '/' .. filename
+    if vim.fn.filereadable(path) == 1 then
+      return path
+    end
+  end
   return nil
 end
 

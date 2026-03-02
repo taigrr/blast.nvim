@@ -14,3 +14,11 @@ end, { desc = 'Ping blastd daemon' })
 vim.api.nvim_create_user_command('BlastSync', function()
   require('blast').sync()
 end, { desc = 'Trigger immediate sync to Blast server' })
+
+vim.api.nvim_create_user_command('BlastStop', function()
+  require('blast').stop()
+end, { desc = 'Stop Blast activity tracking' })
+
+vim.api.nvim_create_user_command('BlastStart', function()
+  require('blast').start()
+end, { desc = 'Start Blast activity tracking' })
