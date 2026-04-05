@@ -40,7 +40,7 @@ local function ensure_blastd()
     os.remove(sock_path)
   end
 
-  local utils = require('blast.utils')
+  local utils = require 'blast.utils'
   local bin = utils.find_blastd_bin()
   if not bin then
     if config.debug then

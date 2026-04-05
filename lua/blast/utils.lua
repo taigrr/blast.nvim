@@ -15,7 +15,8 @@ end
 function M.get_project_info(filepath)
   local dir = vim.fn.fnamemodify(filepath, ':h')
   if project_cache[dir] then
-    return project_cache[dir].project, project_cache[dir].git_remote, project_cache[dir].private, project_cache[dir].git_branch
+    local c = project_cache[dir]
+    return c.project, c.git_remote, c.private, c.git_branch
   end
 
   local project = nil
@@ -152,12 +153,12 @@ function M.find_blastd_bin()
   -- Check glaze.nvim first, then fall back to PATH
   local glaze_ok, glaze = pcall(require, 'glaze')
   if glaze_ok and glaze.bin_path then
-    local bin = glaze.bin_path('blastd')
+    local bin = glaze.bin_path 'blastd'
     if bin and bin ~= '' then
       return bin
     end
   end
-  local bin = vim.fn.exepath('blastd')
+  local bin = vim.fn.exepath 'blastd'
   if bin and bin ~= '' then
     return bin
   end
