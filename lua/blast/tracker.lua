@@ -115,42 +115,39 @@ local function build_activities()
 
   for key, m in pairs(file_metrics) do
     local seconds = m.active_seconds
-    if seconds < 1 and m.action_count == 0 then
-      goto continue
+    if seconds >= 1 or m.action_count > 0 then
+      if seconds < 1 then
+        seconds = 1
+      end
+
+      local minutes = seconds / 60
+      local apm = minutes > 0 and (m.action_count / minutes) or 0
+      local wpm = minutes > 0 and (m.words_added / minutes) or 0
+
+      local filename = nil
+      if not session.private then
+        filename = make_relative(m.filepath)
+      end
+
+      local started_at = now - seconds
+      activities[#activities + 1] = {
+        key = key,
+        payload = {
+          project = project_name,
+          git_remote = remote,
+          git_branch = branch,
+          started_at = os.date('!%Y-%m-%dT%H:%M:%SZ', started_at),
+          ended_at = os.date('!%Y-%m-%dT%H:%M:%SZ', now),
+          filename = filename,
+          filetype = m.filetype,
+          lines_added = m.lines_added,
+          lines_removed = m.lines_removed,
+          actions_per_minute = math.floor(apm * 10) / 10,
+          words_per_minute = math.floor(wpm * 10) / 10,
+          editor = 'neovim',
+        },
+      }
     end
-    if seconds < 1 then
-      seconds = 1
-    end
-
-    local minutes = seconds / 60
-    local apm = minutes > 0 and (m.action_count / minutes) or 0
-    local wpm = minutes > 0 and (m.words_added / minutes) or 0
-
-    local filename = nil
-    if not session.private then
-      filename = make_relative(m.filepath)
-    end
-
-    local started_at = now - seconds
-    activities[#activities + 1] = {
-      key = key,
-      payload = {
-        project = project_name,
-        git_remote = remote,
-        git_branch = branch,
-        started_at = os.date('!%Y-%m-%dT%H:%M:%SZ', started_at),
-        ended_at = os.date('!%Y-%m-%dT%H:%M:%SZ', now),
-        filename = filename,
-        filetype = m.filetype,
-        lines_added = m.lines_added,
-        lines_removed = m.lines_removed,
-        actions_per_minute = math.floor(apm * 10) / 10,
-        words_per_minute = math.floor(wpm * 10) / 10,
-        editor = 'neovim',
-      },
-    }
-
-    ::continue::
   end
 
   return activities
@@ -198,10 +195,7 @@ local function flush()
 
   if config.debug then
     vim.schedule(function()
-      vim.notify(
-        string.format('[blast.nvim] flushed %d file activities', #activities),
-        vim.log.levels.DEBUG
-      )
+      vim.notify(string.format('[blast.nvim] flushed %d file activities', #activities), vim.log.levels.DEBUG)
     end)
   end
 end

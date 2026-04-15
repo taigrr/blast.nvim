@@ -1,10 +1,10 @@
 local M = {}
 
 -- Register with glaze.nvim if available
-local _glaze_ok, _glaze = pcall(require, "glaze")
+local _glaze_ok, _glaze = pcall(require, 'glaze')
 if _glaze_ok then
-  _glaze.register("blastd", "github.com/taigrr/blastd", {
-    plugin = "blast.nvim",
+  _glaze.register('blastd', 'github.com/taigrr/blastd', {
+    plugin = 'blast.nvim',
   })
 end
 
@@ -52,12 +52,11 @@ function M.status()
 
   if session then
     local filetype = nil
-    local file_count = 0
     local current = tracker.get_current_file()
     if current then
       filetype = current.filetype
     end
-    file_count = tracker.get_file_count()
+    local file_count = tracker.get_file_count()
     lines[#lines + 1] = string.format('  Current session: %s', session.project or 'unknown')
     lines[#lines + 1] = string.format('  Filetype: %s', filetype or 'unknown')
     lines[#lines + 1] = string.format('  Files: %d', file_count)
@@ -100,7 +99,6 @@ function M.sync()
     end
   end)
 end
-
 
 local stopped = false
 

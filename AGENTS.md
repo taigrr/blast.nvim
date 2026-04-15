@@ -10,9 +10,14 @@ blast.nvim is a Neovim plugin that tracks coding activity (time, filetypes, APM,
 
 ## Commands
 
-There are no build, test, or lint commands configured for this project. No Makefile, CI workflows, or linting/formatting configs exist.
+**Lint/Format:**
+- `stylua --check .` — check formatting (config in `.stylua.toml`)
+- `stylua .` — auto-format
+- `luacheck lua/ plugin/` — lint (config in `.luacheckrc`)
 
-To manually test, install the plugin in Neovim and run:
+**CI:** GitHub Actions runs stylua and luacheck on push/PR to master.
+
+**Manual testing** — install the plugin in Neovim and run:
 
 - `:BlastStatus` — show socket connection and session info
 - `:BlastPing` — ping the blastd daemon
