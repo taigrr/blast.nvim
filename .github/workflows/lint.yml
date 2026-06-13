@@ -24,4 +24,13 @@ jobs:
       - name: Install luacheck
         run: sudo apt-get install -y lua-check
       - name: Run luacheck
-        run: luacheck lua/ plugin/
+        run: luacheck lua/ plugin/ tests/
+
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install Neovim
+        run: sudo apt-get update && sudo apt-get install -y neovim
+      - name: Run regression test
+        run: nvim --headless -u NONE "+set rtp+=." "+lua dofile('tests/tracker_switch_flush_spec.lua')" +qa
