@@ -326,9 +326,9 @@ function M.on_buffer_activity()
   end
 
   if filepath ~= current_file then
-    vim.schedule(function()
+    if current_file then
       flush()
-    end)
+    end
     get_file_metrics(filepath, filetype)
     clock_in(filepath)
   end
