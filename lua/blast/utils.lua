@@ -12,6 +12,31 @@ local function is_root(dir)
   return false
 end
 
+local function parse_blast_config(content)
+  local parsed = {
+    private = false,
+  }
+
+  for line in content:gmatch '[^\r\n]+' do
+    local stripped = line:match '^%s*(.-)%s*$'
+    if stripped ~= '' and not stripped:match '^#' then
+      local key, raw_value = stripped:match '^([%w_%-]+)%s*=%s*(.-)%s*$'
+      if key and raw_value then
+        local double_quoted = raw_value:match '^"([^"]*)"'
+        local single_quoted = raw_value:match "^'([^']*)'"
+
+        if key == 'name' then
+          parsed.name = double_quoted or single_quoted
+        elseif key == 'private' and raw_value:match '^true%f[%W]' then
+          parsed.private = true
+        end
+      end
+    end
+  end
+
+  return parsed
+end
+
 function M.get_project_info(filepath)
   local dir = vim.fn.fnamemodify(filepath, ':h')
   if project_cache[dir] then
@@ -31,13 +56,11 @@ function M.get_project_info(filepath)
   if blast_config then
     local config_content = M.read_file(blast_config)
     if config_content then
-      local name = config_content:match 'name%s*=%s*"([^"]+)"'
-      if name then
-        project = name
+      local blast_config_data = parse_blast_config(config_content)
+      if blast_config_data.name then
+        project = blast_config_data.name
       end
-      if config_content:match 'private%s*=%s*true' then
-        private = true
-      end
+      private = blast_config_data.private
     end
   end
 
@@ -168,5 +191,7 @@ end
 function M.clear_project_cache()
   project_cache = {}
 end
+
+M._parse_blast_config = parse_blast_config
 
 return M

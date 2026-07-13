@@ -32,5 +32,8 @@ jobs:
       - uses: actions/checkout@v4
       - name: Install Neovim
         run: sudo apt-get update && sudo apt-get install -y neovim
-      - name: Run regression test
-        run: nvim --headless -u NONE "+set rtp+=." "+lua dofile('tests/tracker_switch_flush_spec.lua')" +qa
+      - name: Run regression tests
+        run: |
+          for test_file in tests/*_spec.lua; do
+            nvim --headless -u NONE "+set rtp+=." "+lua dofile('${test_file}')" +qa
+          done
