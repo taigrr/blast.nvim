@@ -22,3 +22,9 @@ private = true # inline comments are ignored by the boolean parser
 
 assert_eq(parsed.name, 'double-quoted', 'double-quoted project names should still be supported')
 assert_eq(parsed.private, true, 'private=true should enable private mode')
+
+parsed = utils._parse_blast_config [[
+name = ""
+]]
+
+assert_eq(parsed.name, nil, 'empty project names should be ignored so the directory fallback applies')

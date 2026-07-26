@@ -26,7 +26,10 @@ local function parse_blast_config(content)
         local single_quoted = raw_value:match "^'([^']*)'"
 
         if key == 'name' then
-          parsed.name = double_quoted or single_quoted
+          local name = double_quoted or single_quoted
+          if name and name ~= '' then
+            parsed.name = name
+          end
         elseif key == 'private' and raw_value:match '^true%f[%W]' then
           parsed.private = true
         end

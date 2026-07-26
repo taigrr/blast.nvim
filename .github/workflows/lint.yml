@@ -34,6 +34,12 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y neovim
       - name: Run regression tests
         run: |
+          shopt -s nullglob
+          status=0
           for test_file in tests/*_spec.lua; do
-            nvim --headless -u NONE "+set rtp+=." "+lua dofile('${test_file}')" +qa
+            echo "Running ${test_file}"
+            nvim --headless -u NONE "+set rtp+=." \
+              "+lua local ok, err = pcall(dofile, '${test_file}'); if not ok then io.stderr:write(tostring(err) .. '\n'); vim.cmd('cq') end" \
+              +qa || status=1
           done
+          exit $status
