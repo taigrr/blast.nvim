@@ -71,6 +71,7 @@ local function new_timer()
       error 'start called on a closed timer handle'
     end
     self.started = true
+    self.stopped = false
     self.callback = callback
   end
 
@@ -191,12 +192,36 @@ local ok, err = pcall(function()
   assert_eq(idle_timer.stopped_before_close, true, 'idle timer should be stopped before it is closed')
   assert_eq(debounce_timer.stopped_before_close, true, 'debounce timer should be stopped before it is closed')
 
+  -- The whole point of closing timers on end_session is that the final
+  -- flush must still reach the socket layer.
+  assert_eq(#sent, 1, 'ending the session should flush the pending activity')
+  assert_eq(sent[1].filetype, 'lua', 'flushed activity should describe the active file')
+
   -- A closed handle must never be reused: new activity should allocate fresh
   -- timers rather than restart the closed ones.
   local before = #timers
   tracker.on_buffer_activity()
   tracker.on_text_change()
-  assert_eq(#timers > before, true, 'new activity after end should allocate fresh timer handles')
+  assert_eq(#timers - before, 3, 'new activity after end should allocate fresh flush, idle, and debounce timers')
+
+  -- A handle whose stop() throws must not prevent close() from running on
+  -- that same handle, nor prevent the other handles from being torn down,
+  -- nor abort end_session before it flushes the final activity.
+  local flush_timer2 = timers[#timers - 2]
+  local idle_timer2 = timers[#timers - 1]
+  local debounce_timer2 = timers[#timers]
+
+  function idle_timer2:stop()
+    error 'simulated stop failure'
+  end
+
+  now = now + idle_timeout + 10
+  idle_timer2.callback()
+
+  assert_eq(idle_timer2.closed, true, 'idle timer should still be closed even if its stop() throws')
+  assert_eq(flush_timer2.closed, true, 'flush timer should still be closed when a sibling timer throws on stop')
+  assert_eq(debounce_timer2.closed, true, 'debounce timer should still be closed when a sibling timer throws on stop')
+  assert_eq(#sent, 2, 'end_session should still flush the final activity even if a timer handle throws')
 end)
 
 os.time = original_time

@@ -101,12 +101,12 @@ local function make_relative(filepath)
   return vim.fn.fnamemodify(filepath, ':t')
 end
 
-local function build_activities()
-  if not current_session then
+local function build_activities(session)
+  session = session or current_session
+  if not session then
     return {}
   end
 
-  local session = current_session
   local project_name = session.private and 'private' or session.project
   local remote = session.private and 'private' or session.git_remote
   local branch = session.private and 'private' or session.git_branch
@@ -200,10 +200,30 @@ local function flush()
   end
 end
 
+local function close_timer(timer, name)
+  local stop_ok, stop_err = pcall(function()
+    timer:stop()
+  end)
+  if not stop_ok and config.debug then
+    vim.schedule(function()
+      vim.notify(string.format('[blast.nvim] %s stop failed: %s', name, tostring(stop_err)), vim.log.levels.WARN)
+    end)
+  end
+
+  local close_ok, close_err = pcall(function()
+    timer:close()
+  end)
+  if not close_ok and config.debug then
+    vim.schedule(function()
+      vim.notify(string.format('[blast.nvim] %s close failed: %s', name, tostring(close_err)), vim.log.levels.WARN)
+    end)
+  end
+end
+
 local function start_flush_timer()
   if flush_timer then
-    flush_timer:stop()
-    flush_timer:close()
+    close_timer(flush_timer, 'flush timer')
+    flush_timer = nil
   end
   flush_timer = uv.new_timer()
   if not flush_timer then
@@ -222,22 +242,19 @@ end
 
 local function stop_flush_timer()
   if flush_timer then
-    flush_timer:stop()
-    flush_timer:close()
+    close_timer(flush_timer, 'flush timer')
     flush_timer = nil
   end
 end
 
 local function stop_session_timers()
   if debounce_timer then
-    debounce_timer:stop()
-    debounce_timer:close()
+    close_timer(debounce_timer, 'debounce timer')
     debounce_timer = nil
   end
 
   if idle_timer then
-    idle_timer:stop()
-    idle_timer:close()
+    close_timer(idle_timer, 'idle timer')
     idle_timer = nil
   end
 
@@ -493,7 +510,7 @@ function M.end_session()
 
   clock_out_current()
 
-  local activities = build_activities()
+  local activities = build_activities(session)
   for _, a in ipairs(activities) do
     socket.send_activity(a.payload)
   end
