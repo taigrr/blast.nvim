@@ -228,6 +228,22 @@ local function stop_flush_timer()
   end
 end
 
+local function stop_session_timers()
+  if debounce_timer then
+    debounce_timer:stop()
+    debounce_timer:close()
+    debounce_timer = nil
+  end
+
+  if idle_timer then
+    idle_timer:stop()
+    idle_timer:close()
+    idle_timer = nil
+  end
+
+  stop_flush_timer()
+end
+
 function M.setup(cfg)
   config = cfg
 
@@ -461,7 +477,7 @@ function M.end_session()
   local session = current_session
   current_session = nil
 
-  stop_flush_timer()
+  stop_session_timers()
 
   local now = os.time()
   local session_duration = now - session.started_at
