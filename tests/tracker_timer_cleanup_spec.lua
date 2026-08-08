@@ -211,7 +211,7 @@ local ok, err = pcall(function()
   local idle_timer2 = timers[#timers - 1]
   local debounce_timer2 = timers[#timers]
 
-  function idle_timer2:stop()
+  function idle_timer2.stop()
     error 'simulated stop failure'
   end
 
