@@ -127,7 +127,7 @@ return M
 
 ### Timers
 
-- `idle_timer` and `debounce_timer` use `uv.new_timer()`, reused across resets (stop + start) to avoid allocating new handles
+- `idle_timer` and `debounce_timer` use `uv.new_timer()`, reused across resets within a session (stop + start) to avoid allocating new handles; on `end_session` they are stopped, closed, and niled (alongside `flush_timer`) via `stop_session_timers`, then lazily recreated on the next activity
 - `ping_timer` runs every 10 seconds for keepalive, started in `setup()`, stopped on shutdown
 - All timer callbacks use `vim.schedule_wrap()` to safely call Neovim APIs from libuv threads
 

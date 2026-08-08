@@ -63,17 +63,29 @@ local function new_timer()
   local timer = {
     closed = false,
     stopped = false,
+    stopped_before_close = false,
   }
 
   function timer:start(_, _, callback)
+    if self.closed then
+      error 'start called on a closed timer handle'
+    end
+    self.started = true
     self.callback = callback
   end
 
   function timer:stop()
+    if self.closed then
+      error 'stop called on a closed timer handle'
+    end
     self.stopped = true
   end
 
   function timer:close()
+    if self.closed then
+      error 'close called on an already-closed timer handle'
+    end
+    self.stopped_before_close = self.stopped
     self.closed = true
   end
 
@@ -146,8 +158,10 @@ end
 local ok, err = pcall(function()
   local tracker = require 'blast.tracker'
 
+  local idle_timeout = 120
+
   tracker.setup {
-    idle_timeout = 120,
+    idle_timeout = idle_timeout,
     debounce_ms = 1000,
     debug = false,
   }
@@ -157,12 +171,32 @@ local ok, err = pcall(function()
 
   assert_eq(#timers, 3, 'setup, activity, and text change should create flush, idle, and debounce timers')
 
-  now = now + 20
-  tracker.end_session()
+  local flush_timer = timers[1]
+  local idle_timer = timers[2]
+  local debounce_timer = timers[3]
 
-  for index, timer in ipairs(timers) do
-    assert_eq(timer.closed, true, string.format('timer %d should be closed when the session ends', index))
-  end
+  assert_eq(idle_timer.callback ~= nil, true, 'idle timer should have a scheduled callback')
+
+  -- Drive end_session through the idle timer's own callback, which is the
+  -- exact path the cleanup must stay safe on (closing the idle timer from
+  -- within its own scheduled callback).
+  now = now + idle_timeout + 10
+  idle_timer.callback()
+
+  assert_eq(flush_timer.closed, true, 'flush timer should be closed when the session ends')
+  assert_eq(idle_timer.closed, true, 'idle timer should be closed when the session ends')
+  assert_eq(debounce_timer.closed, true, 'debounce timer should be closed when the session ends')
+
+  assert_eq(flush_timer.stopped_before_close, true, 'flush timer should be stopped before it is closed')
+  assert_eq(idle_timer.stopped_before_close, true, 'idle timer should be stopped before it is closed')
+  assert_eq(debounce_timer.stopped_before_close, true, 'debounce timer should be stopped before it is closed')
+
+  -- A closed handle must never be reused: new activity should allocate fresh
+  -- timers rather than restart the closed ones.
+  local before = #timers
+  tracker.on_buffer_activity()
+  tracker.on_text_change()
+  assert_eq(#timers > before, true, 'new activity after end should allocate fresh timer handles')
 end)
 
 os.time = original_time
