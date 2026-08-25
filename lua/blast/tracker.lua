@@ -101,6 +101,17 @@ local function make_relative(filepath)
   return vim.fn.fnamemodify(filepath, ':t')
 end
 
+local function session_matches_project_info(project, git_remote, private, git_branch)
+  if not current_session then
+    return false
+  end
+
+  return current_session.project == project
+    and current_session.git_remote == git_remote
+    and current_session.private == (private or false)
+    and current_session.git_branch == git_branch
+end
+
 local function build_activities(session)
   session = session or current_session
   if not session then
@@ -352,7 +363,7 @@ function M.on_buffer_activity()
   last_activity = os.time()
   local project, git_remote, private, git_branch = utils.get_project_info(filepath)
 
-  if not current_session or current_session.project ~= project then
+  if not session_matches_project_info(project, git_remote, private, git_branch) then
     M.end_session()
     utils.clear_project_cache()
     M.start_session(project, git_remote, filetype, private, git_branch)
