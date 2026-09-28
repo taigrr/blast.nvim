@@ -121,6 +121,27 @@ local ok, err = pcall(function()
 
   callbacks[1](nil)
   assert_eq(result, 'request timed out', 'late write callbacks should not change the completed result')
+
+  result_ok = nil
+  result = nil
+  socket.send_sync(function(callback_ok, callback_result)
+    result_ok = callback_ok
+    result = callback_result
+  end)
+
+  assert_eq(#pipes, 2, 'successful sync should open a dedicated pipe')
+  assert_eq(#timers, 2, 'successful sync should start one timeout timer')
+
+  pipes[2].read_callback(nil, '{"ok":true,"message":"synced"}\n')
+
+  assert_eq(result_ok, true, 'successful response should report success')
+  assert_eq(result, 'synced', 'successful response should return the daemon message')
+  assert_eq(pipes[2].stopped, true, 'successful response should stop reading from the request pipe')
+  assert_eq(pipes[2].closed, true, 'successful response should close the request pipe')
+  assert_eq(timers[2].closed, true, 'successful response should close its timer')
+
+  timers[2].callback()
+  assert_eq(result, 'synced', 'late timeout callbacks should not change a completed successful result')
 end)
 
 vim.uv = original_uv
