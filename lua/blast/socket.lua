@@ -259,11 +259,26 @@ function M.request(data, callback)
   end
 
   local completed = false
+  local timeout_timer = nil
+
+  local function close_timeout_timer()
+    if timeout_timer then
+      pcall(function()
+        timeout_timer:stop()
+      end)
+      pcall(function()
+        timeout_timer:close()
+      end)
+      timeout_timer = nil
+    end
+  end
+
   local function finish(ok_val, result)
     if completed then
       return
     end
     completed = true
+    close_timeout_timer()
     pcall(function()
       sock:read_stop()
     end)
@@ -273,6 +288,20 @@ function M.request(data, callback)
     vim.schedule(function()
       callback(ok_val, result)
     end)
+  end
+
+  local request_timeout_ms = tonumber(config.request_timeout_ms) or 5000
+  if request_timeout_ms > 0 then
+    timeout_timer = uv.new_timer()
+    if timeout_timer then
+      timeout_timer:start(
+        request_timeout_ms,
+        0,
+        vim.schedule_wrap(function()
+          finish(false, 'request timed out')
+        end)
+      )
+    end
   end
 
   local conn_ok, conn_err = pcall(function()
