@@ -12,6 +12,7 @@ M.config = {
   socket_path = vim.fn.expand '~/.local/share/blastd/blastd.sock',
   idle_timeout = 120,
   debounce_ms = 1000,
+  request_timeout_ms = 5000,
   debug = false,
 }
 
