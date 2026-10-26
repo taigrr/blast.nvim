@@ -331,7 +331,7 @@ function M.request(data, callback)
         end
 
         local decode_ok, resp = pcall(vim.json.decode, line)
-        if not decode_ok then
+        if not decode_ok or type(resp) ~= 'table' or type(resp.ok) ~= 'boolean' then
           finish(false, 'invalid response')
           return
         end

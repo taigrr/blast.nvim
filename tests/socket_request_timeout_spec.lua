@@ -142,6 +142,33 @@ local ok, err = pcall(function()
 
   timers[2].callback()
   assert_eq(result, 'synced', 'late timeout callbacks should not change a completed successful result')
+
+  local invalid_responses = { 'null', '42', 'true', '"synced"', '[]', '{}', '{"ok":"yes"}' }
+  for _, response in ipairs(invalid_responses) do
+    local callback_count = 0
+    socket.send_sync(function(callback_ok, callback_result)
+      callback_count = callback_count + 1
+      result_ok = callback_ok
+      result = callback_result
+    end)
+    local pipe = pipes[#pipes]
+    local timer = timers[#timers]
+    pipe.read_callback(nil, response .. '\n')
+    assert_eq(result_ok, false, 'invalid response should report failure: ' .. response)
+    assert_eq(result, 'invalid response', 'invalid response should report a useful error: ' .. response)
+    assert_eq(pipe.closed, true, 'invalid response should close its pipe')
+    assert_eq(timer.closed, true, 'invalid response should close its timer')
+    timer.callback()
+    assert_eq(callback_count, 1, 'invalid response should complete exactly once')
+  end
+
+  socket.send_sync(function(callback_ok, callback_result)
+    result_ok = callback_ok
+    result = callback_result
+  end)
+  pipes[#pipes].read_callback(nil, '{"ok":false,"error":"rate limited"}\n')
+  assert_eq(result_ok, false, 'daemon errors should report failure')
+  assert_eq(result, 'rate limited', 'daemon error messages should be preserved')
 end)
 
 vim.uv = original_uv
