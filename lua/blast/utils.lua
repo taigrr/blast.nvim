@@ -19,6 +19,10 @@ local function parse_blast_config(content)
 
   for line in content:gmatch '[^\r\n]+' do
     local stripped = line:match '^%s*(.-)%s*$'
+    -- TOML assignments after a table header no longer belong to the root.
+    if stripped:match '^%[' then
+      break
+    end
     if stripped ~= '' and not stripped:match '^#' then
       local key, raw_value = stripped:match '^([%w_%-]+)%s*=%s*(.-)%s*$'
       if key and raw_value then
