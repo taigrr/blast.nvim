@@ -143,7 +143,38 @@ local ok, err = pcall(function()
   timers[2].callback()
   assert_eq(result, 'synced', 'late timeout callbacks should not change a completed successful result')
 
-  local invalid_responses = { 'null', '42', 'true', '"synced"', '[]', '{}', '{"ok":"yes"}' }
+  local valid_responses = {
+    { json = '{"ok":true}', ok = true, result = 'ok' },
+    { json = '{"ok":false}', ok = false, result = 'unknown error' },
+    { json = '{"ok":false,"error":"sync failed"}', ok = false, result = 'sync failed' },
+  }
+  for _, response in ipairs(valid_responses) do
+    socket.send_sync(function(callback_ok, callback_result)
+      result_ok = callback_ok
+      result = callback_result
+    end)
+    local pipe = pipes[#pipes]
+    pipe.read_callback(nil, response.json:sub(1, 5))
+    pipe.read_callback(nil, response.json:sub(6) .. '\n')
+    assert_eq(result_ok, response.ok, 'valid fragmented response should preserve status')
+    assert_eq(result, response.result, 'valid fragmented response should preserve message or default')
+  end
+
+  local invalid_responses = {
+    'null',
+    '42',
+    'true',
+    '"synced"',
+    '[]',
+    '{}',
+    '{"ok":"yes"}',
+    '{"ok":true,"message":42}',
+    '{"ok":false,"error":{}}',
+    '{"ok":true,"error":false}',
+    '{"ok":false,"message":[]}',
+    '{"ok":true,"message":null}',
+    '{"ok":false,"error":null}',
+  }
   for _, response in ipairs(invalid_responses) do
     local callback_count = 0
     socket.send_sync(function(callback_ok, callback_result)
